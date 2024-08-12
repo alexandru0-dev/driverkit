@@ -1,3 +1,11 @@
+#[cfg(all(feature = "kext", feature = "dext"))]
+compile_error!(
+    "features kext and dext are mutually exclusive, consider using --no-default-features"
+);
+
+#[cfg(not(any(feature = "kext", feature = "dext")))]
+compile_error!("select at one feature from kext and dext");
+
 fn main() {
     let mut build = cc::Build::new();
 
@@ -9,21 +17,18 @@ fn main() {
         .shared_flag(true)
         .flag("-fPIC");
 
-    if let os_info::Version::Semantic(major, minor, patch) = os_info::get().version() {
-        if major <= &10 {
-            println!("macOS version {major}.{minor}.{patch}, using kext...");
-            // kext
-            build.flag("-D");
-            build.flag("USE_KEXT");
-            build.include("c_src/Karabiner-VirtualHIDDevice/dist/include");
-        } else {
-            println!("macOS version {major}.{minor}.{patch}, using dext...");
-            // dext
-            build.include(
-                "c_src/Karabiner-DriverKit-VirtualHIDDevice/include/pqrs/karabiner/driverkit",
-            );
-            build.include("c_src/Karabiner-DriverKit-VirtualHIDDevice/src/Client/vendor/include");
-        }
+    #[cfg(feature = "dext")]
+    {
+        build
+            .include("c_src/Karabiner-DriverKit-VirtualHIDDevice/include/pqrs/karabiner/driverkit");
+        build.include("c_src/Karabiner-DriverKit-VirtualHIDDevice/src/Client/vendor/include");
+    }
+
+    #[cfg(feature = "kext")]
+    {
+        build.flag("-D");
+        build.flag("USE_KEXT");
+        build.include("c_src/Karabiner-VirtualHIDDevice/dist/include");
     }
 
     build.compile("driverkit");
